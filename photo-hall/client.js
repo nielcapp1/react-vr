@@ -11,6 +11,7 @@ function init(bundle, parent, options) {
     raycasters: [
       raycaster // Add SimpleRaycaster to the options
     ],
+    allowCarmelDeeplink: true,
     cursorVisibility: "visible", // Add cursorVisibility
     ...options,
   });

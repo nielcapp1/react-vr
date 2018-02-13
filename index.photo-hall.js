@@ -1,5 +1,5 @@
 import React from 'react';
-import { NativeModules, AppRegistry, asset, Location, Pano, Text, View, VrButton, Image, StyleSheet, CylindricalPanel, Model} from 'react-vr';
+import { NativeModules, AppRegistry, asset, Location, Pano, Text, Animated, View, VrButton, Image, StyleSheet, CylindricalPanel, Model} from 'react-vr';
 import Button from './components/button.js';
 import axios from 'axios';
 import TimerMixin from 'react-timer-mixin';
@@ -8,14 +8,16 @@ const Linking = NativeModules.LinkingManager
 
 class react_vr extends React.Component {
 
-  constructor() { 
+  constructor() {
     super();
-
     this.state = { 
       items: [],
-      currentItem: 1
+      currentItem: 1,
+      bounceValue: new Animated.Value(1),
+      disableButtonPrevious: false,
+      disableButtonNext: false,
+      colorButton: '#7F0000'
     };
-
     this.styles = StyleSheet.create({
       menu: {
         position: 'absolute',
@@ -52,7 +54,7 @@ class react_vr extends React.Component {
         width: 1,
         marginLeft: 0.05,
         marginRight: 0.05,
-        backgroundColor: '#7F0000',
+        backgroundColor: this.state.colorButton,
         borderRadius: .15,
       },
       image: {
@@ -62,29 +64,47 @@ class react_vr extends React.Component {
         overflow: 'hidden',
         transform: [
           {translate: [-5, 3, -10]}, 
-          {scale: 1}, 
+          {scale: this.state.bounceValue},
           {rotateY: 0}, 
           {rotateX: 0},
           {rotateZ: 0} 
         ], 
       }
-    })
+    });
+  }
+
+  bounceAnimation() {
+    this.state.bounceValue.setValue(1.1);
+    Animated.spring(
+      this.state.bounceValue,
+      {
+        toValue: 0.9,
+        friction: 1,
+      }
+    ).start();
   }
 
   previousImage() {
     if (this.state.currentItem > 1) {
-      TimerMixin.setTimeout(() => { this.setState((prevState) => ({ currentItem: prevState.currentItem - 1 })) }, 500)
+      this.setState((prevState) => ({ currentItem: prevState.currentItem - 1 }))
+      this.bounceAnimation()
+      console.log(this.state.currentItem-1)
+      console.log(this.state.items.length)
+      this.enableButtonNext()
+      if ((this.state.currentItem - 1) == 1) {
+        this.disableButtonPrevious()
+      }
     }
   }
 
   nextImage() {
     if (this.state.currentItem < this.state.items.length) {
-      TimerMixin.setTimeout(
-        () => { 
-          this.setState((prevState) => ({ currentItem: prevState.currentItem + 1 })) 
-        },
-        500
-      )
+      this.setState((prevState) => ({ currentItem: prevState.currentItem + 1 }))
+      this.bounceAnimation()
+      this.enableButtonPrevious()
+      if (this.state.items.length == (this.state.currentItem + 1)) {
+        this.disableButtonNext()
+      }
     }
   }
 
@@ -98,17 +118,19 @@ class react_vr extends React.Component {
         if (vrSpaceId == 1) {
           axios.get(`https://jsonplaceholder.typicode.com/photos`)
             .then(res => {
-              const items = res.data.slice(0, 2);
-              this.setState({ items });
-            })
-        }
-        else if (vrSpaceId == 2) {
-          axios.get(`https://jsonplaceholder.typicode.com/photos`)
-            .then(res => {
               const items = res.data.slice(0, 5);
               this.setState({ items });
+              if (this.state.currentItem = 1) {
+                this.disableButtonPrevious()
+              }
+              if (items.length != this.state.currentItem) {
+                this.enableButtonNext()
+              } else {
+                this.disableButtonNext()
+              }
             })
         }
+        
       }
     })
     .catch(err => {
@@ -116,25 +138,60 @@ class react_vr extends React.Component {
     })
   }
 
+  disableButtonPrevious() {
+     this.setState((prevState) => ({ disableButtonPrevious: prevState.disableButtonPrevious = true },
+       { colorButton: prevState.colorButton = '#FFF' }
+     ))
+     this.setState({colorButton: '#FFF'})
+     console.log(this.state.colorButton)
+  }
+
+  enableButtonPrevious() {
+     this.setState((prevState) => ({ disableButtonPrevious: prevState.disableButtonPrevious = false },
+       { colorButton: prevState.colorButton = '#FFF' }
+     ))
+     this.setState({colorButton: '#FFF'})
+     console.log(this.state.colorButton)
+  }
+
+  disableButtonNext() {
+     this.setState((prevState) => (
+       { disableButtonNext: prevState.disableButtonNext = true },
+       { colorButton: prevState.colorButton = '#FFF' }
+     ))
+     this.setState({colorButton: '#FFF'})
+     console.log(this.state.colorButton)
+  }
+
+  enableButtonNext() {
+     this.setState((prevState) => ({ disableButtonNext: prevState.disableButtonNext = false },
+       { colorButton: prevState.colorButton = '#FFF' }
+     ))
+     this.setState({colorButton: '#FFF'})
+     console.log(this.state.colorButton)
+  }
+
   componentDidMount() {
     this.getContent()
+    this.bounceAnimation()
   }
 
   render() {
+    console.log(this.state.items.length)
     return (
       <View>
          <View style={this.styles.menu}>
-            <VrButton style={this.styles.button} onEnter={() => this.previousImage()}> 
+            <VrButton disabled={this.state.disableButtonPrevious} style={this.styles.button} onEnter={() => this.previousImage()} onEnterSound={{ mp3: asset('click.mp3')}} > 
                 <Text style={this.styles.text}>
                   Vorige
                 </Text> 
             </VrButton>
-            <VrButton style={this.styles.button} onEnter={() => this.nextImage()}> 
+            <VrButton disabled={this.state.disableButtonNext} style={this.styles.button} onEnter={() => this.nextImage()} onEnterSound={{ mp3: asset('click.mp3') }}> 
                 <Text style={this.styles.text}>
                   Volgende
                 </Text> 
             </VrButton>
-            <VrButton style={this.styles.button} onEnter={() =>  Linking.openURL("/photo-hall")}> 
+            <VrButton style={this.styles.button} onEnter={() => Linking.openURL("/photo-hall")} onEnterSound={{ mp3: asset('click.mp3')}}> 
                 <Text style={this.styles.text}>
                   Stop 
                 </Text> 
@@ -147,7 +204,7 @@ class react_vr extends React.Component {
               item => (item.id == this.state.currentItem) 
                 ? 
                 <View key={this.state.currentItem}>
-                  <Image style={this.styles.image} source={{uri: this.state.items[this.state.currentItem-1].url}}/>
+                  <Animated.Image style={this.styles.image} source={{uri: this.state.items[this.state.currentItem-1].url}}/>
                   <Text style={this.styles.description}>{this.state.items[this.state.currentItem-1].title}</Text>
                 </View>
                 :
